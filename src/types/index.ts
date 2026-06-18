@@ -129,6 +129,7 @@ export interface DispensingDrug {
 export interface DispensingTask {
   taskId: string
   prescriptionId: string
+  patientId: string
   patientName: string
   drugs: DispensingDrug[]
   status: 'pending' | 'dispensing' | 'scanning' | 'completed'

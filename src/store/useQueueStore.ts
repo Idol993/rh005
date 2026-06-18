@@ -22,9 +22,13 @@ interface QueueState {
     estimatedWait: number
   }) => number
   callNext: () => void
+  callNextForDoctor: (doctorName: string) => number | null
   adjustPriority: (queueNumber: number, delta: number) => void
   recalculateWaitTimes: () => void
   getLatestRegistrationForPatient: (patientId: string) => QueueItem | null
+  getCurrentForDoctor: (doctorName: string) => QueueItem | null
+  getDoctorQueue: (doctorName: string) => QueueItem[]
+  getDoctors: () => { doctorName: string; department: string; waitingCount: number; currentNumber: number | null }[]
 }
 
 export const useQueueStore = create<QueueState>((set, get) => ({
@@ -36,8 +40,8 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     const { items } = get()
     const existingNumbers = [...mockQueueItems, ...items].map((i) => i.queueNumber)
     const newNumber = Math.max(0, ...existingNumbers) + 1
-    const waitingItems = items.filter((i) => i.status === 'waiting')
-    const priority = waitingItems.length + 1
+    const doctorWaiting = items.filter((i) => i.status === 'waiting' && i.doctorName === doctorName)
+    const priority = doctorWaiting.length + 1
     const newItem: QueueItem = {
       queueNumber: newNumber,
       patientName,
@@ -75,19 +79,38 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     get().recalculateWaitTimes()
   },
 
+  callNextForDoctor: (doctorName) => {
+    const { items } = get()
+    const doctorWaiting = items
+      .filter((i) => i.status === 'waiting' && i.doctorName === doctorName)
+      .sort((a, b) => a.priority - b.priority || a.queueNumber - b.queueNumber)
+    if (doctorWaiting.length === 0) return null
+    const nextItem = doctorWaiting[0]
+
+    const updated = items.map((i) => {
+      if (i.queueNumber === nextItem.queueNumber) return { ...i, status: 'called' as const, estimatedWait: 0 }
+      if (i.doctorName === doctorName && i.status === 'called') return { ...i, status: 'consulting' as const }
+      if (i.doctorName === doctorName && i.status === 'consulting') return { ...i, status: 'done' as const }
+      return i
+    })
+    set({ items: updated, currentNumber: nextItem.queueNumber })
+    get().recalculateWaitTimes()
+    return nextItem.queueNumber
+  },
+
   adjustPriority: (queueNumber: number, delta: number) => {
     const { items } = get()
     const target = items.find((i) => i.queueNumber === queueNumber && i.status === 'waiting')
     if (!target) return
-    const waitingSorted = items
-      .filter((i) => i.status === 'waiting')
+    const doctorWaiting = items
+      .filter((i) => i.status === 'waiting' && i.doctorName === target.doctorName)
       .sort((a, b) => a.priority - b.priority || a.queueNumber - b.queueNumber)
-    const currentIdx = waitingSorted.findIndex((i) => i.queueNumber === queueNumber)
-    const newIdx = Math.max(0, Math.min(waitingSorted.length - 1, currentIdx + delta))
+    const currentIdx = doctorWaiting.findIndex((i) => i.queueNumber === queueNumber)
+    const newIdx = Math.max(0, Math.min(doctorWaiting.length - 1, currentIdx + delta))
     if (currentIdx === newIdx) return
-    const [moved] = waitingSorted.splice(currentIdx, 1)
-    waitingSorted.splice(newIdx, 0, moved)
-    const priorityMap = new Map(waitingSorted.map((it, idx) => [it.queueNumber, idx + 1]))
+    const [moved] = doctorWaiting.splice(currentIdx, 1)
+    doctorWaiting.splice(newIdx, 0, moved)
+    const priorityMap = new Map(doctorWaiting.map((it, idx) => [it.queueNumber, idx + 1]))
     const updated = items.map((i) => {
       const newPrio = priorityMap.get(i.queueNumber)
       if (newPrio !== undefined) return { ...i, priority: newPrio }
@@ -100,13 +123,22 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   recalculateWaitTimes: () => {
     set((state) => {
       const perPatientWait = 15
-      const waitingSorted = state.items
-        .filter((i) => i.status === 'waiting')
-        .sort((a, b) => a.priority - b.priority || a.queueNumber - b.queueNumber)
-      const waitMap = new Map<number, number>()
-      waitingSorted.forEach((it, idx) => {
-        waitMap.set(it.queueNumber, (idx + 1) * perPatientWait)
+      const doctorGroups = new Map<string, QueueItem[]>()
+      state.items.forEach((i) => {
+        if (i.status !== 'waiting') return
+        const arr = doctorGroups.get(i.doctorName) || []
+        arr.push(i)
+        doctorGroups.set(i.doctorName, arr)
       })
+
+      const waitMap = new Map<number, number>()
+      doctorGroups.forEach((doctorItems) => {
+        const sorted = [...doctorItems].sort((a, b) => a.priority - b.priority || a.queueNumber - b.queueNumber)
+        sorted.forEach((it, idx) => {
+          waitMap.set(it.queueNumber, (idx + 1) * perPatientWait)
+        })
+      })
+
       return {
         items: state.items.map((i) => {
           const wait = waitMap.get(i.queueNumber)
@@ -128,5 +160,45 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     const fallback = items.filter((i) => i.patientId === patientId)
     if (fallback.length === 0) return null
     return fallback.sort((a, b) => b.queueNumber - a.queueNumber)[0]
+  },
+
+  getCurrentForDoctor: (doctorName) => {
+    const { items } = get()
+    const called = items.find((i) => i.doctorName === doctorName && i.status === 'called')
+    if (called) return called
+    const consulting = items.find((i) => i.doctorName === doctorName && i.status === 'consulting')
+    if (consulting) return consulting
+    return null
+  },
+
+  getDoctorQueue: (doctorName) => {
+    const { items } = get()
+    return items
+      .filter((i) => i.doctorName === doctorName)
+      .sort((a, b) => {
+        const order = { called: 0, consulting: 1, waiting: 2, done: 3 }
+        if (a.status !== b.status) return order[a.status] - order[b.status]
+        if (a.status === 'waiting') return a.priority - b.priority
+        return b.queueNumber - a.queueNumber
+      })
+  },
+
+  getDoctors: () => {
+    const { items } = get()
+    const doctorMap = new Map<string, { doctorName: string; department: string; waitingCount: number; currentNumber: number | null }>()
+    items.forEach((i) => {
+      if (!doctorMap.has(i.doctorName)) {
+        doctorMap.set(i.doctorName, {
+          doctorName: i.doctorName,
+          department: i.department,
+          waitingCount: 0,
+          currentNumber: null,
+        })
+      }
+      const info = doctorMap.get(i.doctorName)!
+      if (i.status === 'waiting') info.waitingCount++
+      if (i.status === 'called') info.currentNumber = i.queueNumber
+    })
+    return Array.from(doctorMap.values())
   },
 }))

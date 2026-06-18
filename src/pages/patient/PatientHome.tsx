@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useQueueStore } from '@/store/useQueueStore'
 import { useReportsStore } from '@/store/useReportsStore'
+import { usePharmacyStore } from '@/store/usePharmacyStore'
 import {
   ClipboardList,
   ArrowRightLeft,
@@ -13,6 +14,8 @@ import {
   ChevronRight,
   Bell,
   X,
+  Pill,
+  PackageCheck,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -57,6 +60,25 @@ export default function PatientHome() {
 
   const myReports = reports.filter((r) => r.patientId === user?.id)
   const abnormalCount = myReports.reduce((sum, r) => sum + r.abnormalItems.length, 0)
+
+  const pharmacyTasks = usePharmacyStore((s) => s.tasks)
+  const myPharmacyTasks = pharmacyTasks
+    .filter((t) => t.patientId === user?.id)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const latestPharmacyTask = myPharmacyTasks[0] ?? null
+
+  const pharmStatusLabel: Record<string, string> = {
+    pending: '待调配',
+    dispensing: '调配中',
+    scanning: '扫码核对中',
+    completed: '可取药',
+  }
+  const pharmStatusColor: Record<string, string> = {
+    pending: 'text-amber-500',
+    dispensing: 'text-primary-500',
+    scanning: 'text-blue-500',
+    completed: 'text-success-500',
+  }
 
   const myUnreadNotif = notifications.find(
     (n) => n.patientId === user?.id && !n.read && n.id !== dismissedNotif
@@ -209,6 +231,36 @@ export default function PatientHome() {
               <span className="text-sm text-gray-500">过敏记录</span>
               <span className="text-lg font-bold text-amber-500">1项</span>
             </div>
+            {latestPharmacyTask && (
+              <div className="pt-3 border-t border-gray-50">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-gray-500 flex items-center gap-1">
+                    <Pill size={12} />
+                    取药状态
+                  </span>
+                  <span className={`text-sm font-bold ${pharmStatusColor[latestPharmacyTask.status]}`}>
+                    {pharmStatusLabel[latestPharmacyTask.status]}
+                  </span>
+                </div>
+                {latestPharmacyTask.status !== 'pending' && latestPharmacyTask.status !== 'completed' && (
+                  <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1.5">
+                    <div
+                      className="bg-primary-500 h-1.5 rounded-full"
+                      style={{ width: `${latestPharmacyTask.progress}%` }}
+                    />
+                  </div>
+                )}
+                <div className="text-[11px] text-gray-400 mt-1.5">
+                  {latestPharmacyTask.drugs.length} 种药品 · 任务号 {latestPharmacyTask.taskId}
+                </div>
+                {latestPharmacyTask.status === 'completed' && (
+                  <div className="flex items-center gap-1 text-[11px] text-success-600 mt-1.5 bg-success-50 px-2 py-1 rounded-md">
+                    <PackageCheck size={12} />
+                    请到取药窗口领取
+                  </div>
+                )}
+              </div>
+            )}
             {myReports.length > 0 && (
               <button
                 onClick={() => navigate('/patient/reports')}

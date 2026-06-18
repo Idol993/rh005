@@ -1,7 +1,15 @@
 import { useEffect, useMemo } from 'react'
 import { useQueueStore } from '@/store/useQueueStore'
 import { useAuthStore } from '@/store/useAuthStore'
-import { Volume2, Clock, Users, RefreshCw, Pin } from 'lucide-react'
+import {
+  Volume2,
+  Clock,
+  Users,
+  RefreshCw,
+  Pin,
+  Stethoscope,
+  ChevronRight,
+} from 'lucide-react'
 
 const statusLabel: Record<string, string> = {
   waiting: '等候中',
@@ -18,7 +26,14 @@ const statusBadge: Record<string, string> = {
 }
 
 export default function Queue() {
-  const { items, currentNumber, callNext, getLatestRegistrationForPatient, registrations } = useQueueStore()
+  const {
+    items,
+    getLatestRegistrationForPatient,
+    registrations,
+    getDoctors,
+    getCurrentForDoctor,
+    getDoctorQueue,
+  } = useQueueStore()
   const user = useAuthStore((s) => s.user)
 
   const myItem = useMemo(() => {
@@ -26,19 +41,19 @@ export default function Queue() {
     return getLatestRegistrationForPatient(user.id)
   }, [user?.id, items, registrations, getLatestRegistrationForPatient])
 
-  const waitingSorted = useMemo(
-    () =>
-      items
-        .filter((i) => i.status === 'waiting')
-        .sort((a, b) => a.priority - b.priority || a.queueNumber - b.queueNumber),
-    [items]
-  )
+  const doctors = useMemo(() => getDoctors(), [items])
 
-  const myPosition = myItem?.status === 'waiting'
-    ? waitingSorted.findIndex((i) => i.queueNumber === myItem.queueNumber) + 1
-    : null
+  const myPosition = useMemo(() => {
+    if (!myItem || myItem.status !== 'waiting') return null
+    const doctorQueue = getDoctorQueue(myItem.doctorName)
+    const waitingItems = doctorQueue.filter((i) => i.status === 'waiting')
+    return waitingItems.findIndex((i) => i.queueNumber === myItem.queueNumber) + 1
+  }, [myItem, items])
 
-  const waitingCount = waitingSorted.length
+  const myDoctorCurrent = useMemo(() => {
+    if (!myItem) return null
+    return getCurrentForDoctor(myItem.doctorName)
+  }, [myItem, items])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -49,115 +64,154 @@ export default function Queue() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div className="grid grid-cols-3 gap-4">
-        <div className="card bg-gradient-to-br from-primary-500 to-primary-700 text-white border-0 text-center">
-          <Volume2 size={24} className="mx-auto mb-2 text-primary-200" />
-          <div className="text-sm text-primary-100 mb-1">当前叫号</div>
-          <div className="stat-value text-white">{currentNumber}</div>
-        </div>
-
-        <div className="card text-center">
-          <Users size={24} className="mx-auto mb-2 text-gray-300" />
-          <div className="text-sm text-gray-500 mb-1">您的排队号</div>
-          <div className="stat-value text-primary-500">{myItem?.queueNumber ?? '--'}</div>
-          {myItem && (
-            <div className="text-xs text-gray-400 mt-1">
-              {myItem.status === 'waiting' && `前方还有 ${Math.max(0, (myPosition ?? 1) - 1)} 人`}
-              {myItem.status === 'consulting' && <span className="text-primary-500">就诊中</span>}
-              {myItem.status === 'called' && <span className="text-danger-500 animate-blink">正在叫号中</span>}
-              {myItem.status === 'done' && <span className="text-success-500">已完成</span>}
+      {myItem && (
+        <div className="card bg-gradient-to-br from-primary-500 to-primary-700 text-white border-0">
+          <div className="flex items-center gap-2 mb-3">
+            <Stethoscope size={18} className="text-primary-200" />
+            <span className="text-sm text-primary-100">我的就诊 · {myItem.department}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-sm text-primary-200 mb-1">当前叫号</div>
+              <div className="text-3xl font-bold font-mono">
+                {myDoctorCurrent ? myDoctorCurrent.queueNumber : '--'}
+              </div>
+              <div className="text-xs text-primary-200 mt-1">
+                {myDoctorCurrent ? statusLabel[myDoctorCurrent.status] : '暂无'}
+              </div>
+            </div>
+            <div className="text-center border-x border-primary-400/30">
+              <div className="text-sm text-primary-200 mb-1">我的排队号</div>
+              <div className="text-3xl font-bold font-mono">
+                {myItem.queueNumber}
+              </div>
+              <div className="text-xs text-primary-200 mt-1">
+                {myItem.status === 'waiting' && `前面还有 ${(myPosition ?? 1) - 1} 位`}
+                {myItem.status === 'consulting' && '就诊中'}
+                {myItem.status === 'called' && '正在叫号'}
+                {myItem.status === 'done' && '已完成'}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm text-primary-200 mb-1">预计等候</div>
+              <div className="text-3xl font-bold font-mono">
+                {myItem.estimatedWait > 0 ? `${myItem.estimatedWait}` : '0'}
+                <span className="text-lg font-normal ml-0.5">分钟</span>
+              </div>
+              <div className="text-xs text-primary-200 mt-1">{myItem.doctorName}医生</div>
+            </div>
+          </div>
+          {myItem.status === 'called' && (
+            <div className="mt-4 bg-white/20 backdrop-blur rounded-lg p-3 text-center animate-pulse-slow">
+              <Volume2 size={18} className="inline mr-2" />
+              <span className="font-semibold">请 {myItem.patientName} 请到 {myItem.doctorName} 医生诊室就诊！</span>
             </div>
           )}
-          {myItem && myItem.status === 'waiting' && (
-            <div className="text-xs text-gray-400 mt-0.5">
-              {myItem.department} · {myItem.doctorName}
-            </div>
-          )}
-        </div>
-
-        <div className="card text-center">
-          <Clock size={24} className="mx-auto mb-2 text-gray-300" />
-          <div className="text-sm text-gray-500 mb-1">预计等候</div>
-          <div className="stat-value text-amber-500">
-            {myItem?.estimatedWait ?? 0}
-            <span className="text-base ml-1">分钟</span>
-          </div>
-        </div>
-      </div>
-
-      {myItem && myItem.status === 'called' && (
-        <div className="card border-2 border-danger-500 bg-danger-50 animate-pulse-slow">
-          <div className="flex items-center justify-center gap-3 text-danger-600">
-            <Volume2 size={24} />
-            <span className="text-lg font-bold">
-              请 {myItem.patientName} 到 {myItem.department}（{myItem.doctorName}）就诊！
-            </span>
-          </div>
         </div>
       )}
 
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-gray-800">排队列表</h2>
-            <span className="badge badge-primary">{waitingCount} 人等候</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <RefreshCw size={14} className="text-gray-400 animate-spin" style={{ animationDuration: '3s' }} />
-            <span className="text-xs text-gray-400">自动刷新</span>
-          </div>
+      {!myItem && (
+        <div className="card text-center py-10">
+          <Users size={40} className="mx-auto text-gray-200 mb-3" />
+          <p className="text-gray-400 mb-1">暂无挂号记录</p>
+          <p className="text-xs text-gray-300">完成挂号后，这里会显示您的候诊信息</p>
         </div>
+      )}
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100">
-              <th className="text-left py-2.5 text-gray-500 font-medium">排队号</th>
-              <th className="text-left py-2.5 text-gray-500 font-medium">患者</th>
-              <th className="text-left py-2.5 text-gray-500 font-medium">科室</th>
-              <th className="text-left py-2.5 text-gray-500 font-medium">医生</th>
-              <th className="text-left py-2.5 text-gray-500 font-medium">状态</th>
-              <th className="text-left py-2.5 text-gray-500 font-medium">预计等候</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => {
-              const isMyCurrent = myItem?.queueNumber === item.queueNumber
-              return (
-                <tr
-                  key={item.queueNumber}
-                  className={`border-b border-gray-50 ${item.status === 'called' ? 'bg-danger-50/50' : ''} ${
-                    isMyCurrent ? 'bg-primary-50' : ''
-                  }`}
-                >
-                  <td className="py-2.5 font-mono font-medium">
-                    {item.queueNumber}
-                    {isMyCurrent && (
-                      <span className="inline-flex items-center gap-0.5 ml-2 px-1.5 py-0.5 rounded bg-primary-500 text-white text-[10px] font-medium align-middle">
-                        <Pin size={9} />本次
-                      </span>
-                    )}
-                  </td>
-                  <td className={`py-2.5 ${isMyCurrent ? 'font-semibold text-primary-700' : ''}`}>
-                    {item.patientName}
-                  </td>
-                  <td className="py-2.5">{item.department}</td>
-                  <td className="py-2.5">{item.doctorName}</td>
-                  <td className="py-2.5">
-                    <span className={`badge ${statusBadge[item.status]}`}>{statusLabel[item.status]}</span>
-                  </td>
-                  <td className="py-2.5 text-gray-500">{item.estimatedWait > 0 ? `${item.estimatedWait}分钟` : '-'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+          <Stethoscope size={18} className="text-primary-500" />
+          各诊室候诊情况
+        </h2>
+        <div className="flex items-center gap-2">
+          <RefreshCw size={14} className="text-gray-400 animate-spin" style={{ animationDuration: '3s' }} />
+          <span className="text-xs text-gray-400">自动刷新</span>
+        </div>
       </div>
 
-      <div className="card flex items-center justify-between">
-        <span className="text-sm text-gray-500">管理员测试：模拟叫号</span>
-        <button onClick={callNext} className="btn-primary flex items-center gap-2">
-          <Volume2 size={16} />叫号
-        </button>
+      <div className="space-y-4">
+        {doctors.map((doc) => {
+          const queue = getDoctorQueue(doc.doctorName)
+          const isMyDoctor = myItem?.doctorName === doc.doctorName
+          const currentDoc = getCurrentForDoctor(doc.doctorName)
+
+          return (
+            <div
+              key={doc.doctorName}
+              className={`card overflow-hidden ${isMyDoctor ? 'ring-2 ring-primary-300' : ''}`}
+            >
+              <div className={`px-5 py-3 border-b border-gray-100 flex items-center justify-between ${isMyDoctor ? 'bg-primary-50' : 'bg-gray-50'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full bg-white flex items-center justify-center text-sm font-bold text-primary-600`}>
+                    {doc.doctorName.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-800 flex items-center gap-2">
+                      {doc.doctorName}
+                      {isMyDoctor && (
+                        <span className="px-1.5 py-0.5 rounded bg-primary-500 text-white text-[10px] font-medium">
+                          <Pin size={9} className="inline mr-0.5" />我的医生
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500">{doc.department}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500">当前叫号</div>
+                    <div className="font-mono font-bold text-primary-600">
+                      {currentDoc ? currentDoc.queueNumber : '--'}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500">等待中</div>
+                    <div className="font-mono font-bold text-amber-600">{doc.waitingCount}人</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-5 py-3">
+                {queue.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">暂无患者</p>
+                ) : (
+                  <div className="space-y-1">
+                    {queue.map((item) => {
+                      const isMine = item.patientId === user?.id && item.queueNumber === myItem?.queueNumber
+                      let rowClass = 'flex items-center justify-between py-2 px-3 rounded-lg '
+                      if (isMine) rowClass += 'bg-primary-100 '
+                      if (item.status === 'called') rowClass += 'bg-danger-50 '
+                      if (item.status === 'consulting') rowClass += 'bg-primary-50 '
+                      return (
+                        <div key={item.queueNumber} className={rowClass.trim()}>
+                          <div className="flex items-center gap-3">
+                            <span className={`font-mono font-bold w-14 ${item.status === 'waiting' ? 'text-gray-600' : 'text-primary-600'}`}>
+                              {item.queueNumber}
+                            </span>
+                            <span className="text-sm text-gray-700">
+                              {isMine ? '我' : item.patientName}
+                            </span>
+                            {isMine && <Pin size={12} className="text-primary-500" />}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {item.status === 'waiting' && (
+                              <span className="text-xs text-gray-400">
+                                约 {item.estimatedWait} 分钟
+                              </span>
+                            )}
+                            <span className={`badge ${statusBadge[item.status]} text-[10px]`}>
+                              {statusLabel[item.status]}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

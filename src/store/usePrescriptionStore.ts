@@ -123,6 +123,7 @@ export const usePrescriptionStore = create<PrescriptionState>((set, get) => ({
     }))
     usePharmacyStore.getState().addDispensingTask({
       prescriptionId: prescription.id,
+      patientId: currentPatientId,
       patientName: currentPatientName,
       drugs: dispensingDrugs,
     })

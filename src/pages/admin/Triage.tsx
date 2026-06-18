@@ -1,7 +1,7 @@
 import { useQueueStore } from '@/store/useQueueStore'
 import { mockDoctors } from '@/mock/data'
 import type { QueueItem } from '@/types'
-import { Users, Clock, Megaphone, ArrowUp, ArrowDown, Stethoscope } from 'lucide-react'
+import { Users, Clock, Megaphone, ArrowUp, ArrowDown, Stethoscope, ChevronRight } from 'lucide-react'
 
 const statusLabel: Record<QueueItem['status'], { text: string; cls: string }> = {
   waiting: { text: '候诊中', cls: 'bg-gray-100 text-gray-600' },
@@ -11,65 +11,93 @@ const statusLabel: Record<QueueItem['status'], { text: string; cls: string }> = 
 }
 
 export default function Triage() {
-  const { items, callNext, currentNumber } = useQueueStore()
+  const { items, callNext, currentNumber, callNextForDoctor, adjustPriority, getDoctors, getDoctorQueue, getCurrentForDoctor } = useQueueStore()
 
-  const departments = mockDoctors.reduce<Record<string, { queueLength: number; estimatedWait: number }>>((acc, d) => {
-    if (!acc[d.department]) {
-      acc[d.department] = { queueLength: 0, estimatedWait: 0 }
-    }
-    acc[d.department].queueLength += d.queueLength
-    acc[d.department].estimatedWait = Math.max(acc[d.department].estimatedWait, d.estimatedWait)
-    return acc
-  }, {})
-
-  const deptQueueMap = items.reduce<Record<string, QueueItem[]>>((acc, item) => {
-    if (!acc[item.department]) acc[item.department] = []
-    acc[item.department].push(item)
-    return acc
-  }, {})
-
-  const adjustPriority = (queueNumber: number, delta: number) => {
-    useQueueStore.getState().adjustPriority(queueNumber, delta)
-  }
+  const doctors = getDoctors()
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">导诊管理</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">导诊管理</h1>
+          <p className="text-sm text-gray-500 mt-0.5">按诊室分别叫号 · 支持优先级调整</p>
+        </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">当前叫号: <span className="font-mono font-bold text-primary-500">{currentNumber}</span></span>
-          <button className="btn-primary flex items-center gap-2" onClick={callNext}>
-            <Megaphone className="w-4 h-4" />叫号
+          <span className="text-sm text-gray-500">全局最近叫号: <span className="font-mono font-bold text-primary-500">{currentNumber}</span></span>
+          <button className="btn-secondary flex items-center gap-2" onClick={callNext}>
+            <Megaphone className="w-4 h-4" />全局叫号
           </button>
         </div>
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">科室状态</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {Object.entries(departments).map(([dept, info]) => (
-            <div key={dept} className="card">
-              <div className="flex items-center gap-2 mb-2">
-                <Stethoscope className="w-4 h-4 text-primary-500" />
-                <span className="font-medium text-sm">{dept}</span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-1 text-sm text-gray-500">
-                  <Users className="w-3 h-3" />
-                  <span>排队: {deptQueueMap[dept]?.filter((i) => i.status === 'waiting').length ?? 0}人</span>
+        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <Stethoscope size={20} className="text-primary-500" />
+          诊室状态
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {doctors.map((doc) => {
+            const queue = getDoctorQueue(doc.doctorName)
+            const current = getCurrentForDoctor(doc.doctorName)
+            const waitingCount = queue.filter((i) => i.status === 'waiting').length
+
+            return (
+              <div key={doc.doctorName} className="card p-0 overflow-hidden">
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-bold text-sm">
+                      {doc.doctorName.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="font-medium text-sm text-gray-800">{doc.doctorName}</div>
+                      <div className="text-xs text-gray-500">{doc.department}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => callNextForDoctor(doc.doctorName)}
+                    className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1"
+                    disabled={waitingCount === 0}
+                  >
+                    <Megaphone size={12} />
+                    叫号
+                  </button>
                 </div>
-                <div className="flex items-center gap-1 text-sm text-gray-500">
-                  <Clock className="w-3 h-3" />
-                  <span>预计: {info.estimatedWait}分钟</span>
+                <div className="px-4 py-3 grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-0.5">当前</div>
+                    <div className="font-mono font-bold text-primary-600">
+                      {current ? current.queueNumber : '--'}
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      {current ? statusLabel[current.status].text : '空闲'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 mb-0.5">等待</div>
+                    <div className="font-mono font-bold text-amber-600">{waitingCount}</div>
+                    <div className="text-[10px] text-gray-400">人候诊</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 mb-0.5">首候</div>
+                    <div className="font-mono font-bold text-gray-600">
+                      {queue.filter(i=>i.status==='waiting').length > 0
+                        ? queue.find(i=>i.status==='waiting')?.queueNumber
+                        : '--'}
+                    </div>
+                    <div className="text-[10px] text-gray-400">下一位</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">排队总览</h2>
+        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <Users size={20} className="text-primary-500" />
+          排队总览
+        </h2>
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -97,14 +125,26 @@ export default function Triage() {
                   <td className="py-3">{item.estimatedWait > 0 ? `${item.estimatedWait}分钟` : '-'}</td>
                   <td className="py-3 font-mono">{item.priority}</td>
                   <td className="py-3">
-                    <div className="flex gap-1">
-                      <button className="p-1 rounded hover:bg-gray-100" onClick={() => adjustPriority(item.queueNumber, -1)}>
-                        <ArrowUp className="w-4 h-4 text-success-500" />
-                      </button>
-                      <button className="p-1 rounded hover:bg-gray-100" onClick={() => adjustPriority(item.queueNumber, 1)}>
-                        <ArrowDown className="w-4 h-4 text-gray-400" />
-                      </button>
-                    </div>
+                    {item.status === 'waiting' ? (
+                      <div className="flex gap-1">
+                        <button
+                          className="p-1 rounded hover:bg-gray-100"
+                          onClick={() => adjustPriority(item.queueNumber, -1)}
+                          title="上移（提前）"
+                        >
+                          <ArrowUp className="w-4 h-4 text-success-500" />
+                        </button>
+                        <button
+                          className="p-1 rounded hover:bg-gray-100"
+                          onClick={() => adjustPriority(item.queueNumber, 1)}
+                          title="下移（延后）"
+                        >
+                          <ArrowDown className="w-4 h-4 text-gray-400" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

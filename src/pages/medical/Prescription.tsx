@@ -199,6 +199,7 @@ export default function Prescription() {
                       }
                       usePharmacyStore.getState().addDispensingTask({
                         prescriptionId: prescription.id,
+                        patientId: s.currentPatientId,
                         patientName: s.currentPatientName,
                         drugs: s.draftItems.map((item) => ({
                           drugId: item.drugId,

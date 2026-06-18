@@ -44,10 +44,16 @@ export default function PatientHome() {
   const [dismissedNotif, setDismissedNotif] = useState<string | null>(null)
 
   const myRegs = registrations.filter((r) => r.patientId === user?.id)
-  const myRegsWithStatus = myRegs.map((r) => {
-    const queue = items.find((i) => i.queueNumber === r.queueNumber)
-    return { ...r, status: queue?.status || 'waiting' }
-  })
+  const myRegsWithStatus = myRegs
+    .map((r) => {
+      const queue = items.find((i) => i.queueNumber === r.queueNumber)
+      return {
+        ...r,
+        status: queue?.status || 'waiting',
+        estimatedWait: queue?.estimatedWait ?? r.estimatedWait,
+      }
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
   const myReports = reports.filter((r) => r.patientId === user?.id)
   const abnormalCount = myReports.reduce((sum, r) => sum + r.abnormalItems.length, 0)
@@ -152,15 +158,27 @@ export default function PatientHome() {
             </div>
           ) : (
             <div className="space-y-3">
-              {myRegsWithStatus.map((apt) => (
-                <div key={apt.queueNumber} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+              {myRegsWithStatus.map((apt, idx) => (
+                <div
+                  key={apt.queueNumber}
+                  className={`flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0 rounded-lg ${
+                    idx === 0 ? 'bg-primary-50/60 px-2 -mx-2' : ''
+                  }`}
+                >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+                    <div className={`w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 ${
+                      idx === 0 ? 'ring-2 ring-primary-300' : ''
+                    }`}>
                       <Calendar size={18} className="text-primary-500" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-gray-800">
+                      <div className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
                         {apt.department} · {apt.doctorName}
+                        {idx === 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-primary-500 text-white text-[10px] font-medium">
+                            本次
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-400 flex items-center gap-1">
                         <Clock size={12} />排队号 {apt.queueNumber} · 预计 {apt.estimatedWait} 分钟

@@ -7,21 +7,23 @@ interface PharmacyState {
   addDispensingTask: (task: Omit<DispensingTask, 'taskId' | 'progress' | 'robotArmStatus' | 'status' | 'createdAt'>) => string
   advanceTask: (taskId: string, action: 'start' | 'scan' | 'complete') => void
   verifyDrug: (taskId: string, drugId: string) => void
-}
-
-function buildTaskId() {
-  const maxNum = Math.max(
-    0,
-    ...mockDispensingTasks.map((t) => parseInt(t.taskId.replace('DT', ''), 10) || 0)
-  )
-  return `DT${String(maxNum + 1).padStart(3, '0')}`
+  getNextTaskId: () => string
 }
 
 export const usePharmacyStore = create<PharmacyState>((set, get) => ({
   tasks: [...mockDispensingTasks],
 
+  getNextTaskId: () => {
+    const { tasks } = get()
+    const allIds = [...mockDispensingTasks, ...tasks].map((t) =>
+      parseInt(t.taskId.replace('DT', ''), 10) || 0
+    )
+    const maxNum = Math.max(0, ...allIds)
+    return `DT${String(maxNum + 1).padStart(3, '0')}`
+  },
+
   addDispensingTask: (partial) => {
-    const taskId = buildTaskId()
+    const taskId = get().getNextTaskId()
     const newTask: DispensingTask = {
       ...partial,
       taskId,

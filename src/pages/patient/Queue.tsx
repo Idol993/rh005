@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useQueueStore } from '@/store/useQueueStore'
 import { useAuthStore } from '@/store/useAuthStore'
-import { Volume2, Clock, Users, RefreshCw } from 'lucide-react'
+import { Volume2, Clock, Users, RefreshCw, Pin } from 'lucide-react'
 
 const statusLabel: Record<string, string> = {
   waiting: '等候中',
@@ -18,13 +18,22 @@ const statusBadge: Record<string, string> = {
 }
 
 export default function Queue() {
-  const { items, currentNumber, callNext } = useQueueStore()
+  const { items, currentNumber, callNext, getLatestRegistrationForPatient, registrations } = useQueueStore()
   const user = useAuthStore((s) => s.user)
 
-  const myItem = items.find((i) => i.patientId === user?.id)
-  const waitingSorted = items
-    .filter((i) => i.status === 'waiting')
-    .sort((a, b) => a.priority - b.priority || a.queueNumber - b.queueNumber)
+  const myItem = useMemo(() => {
+    if (!user) return null
+    return getLatestRegistrationForPatient(user.id)
+  }, [user?.id, items, registrations, getLatestRegistrationForPatient])
+
+  const waitingSorted = useMemo(
+    () =>
+      items
+        .filter((i) => i.status === 'waiting')
+        .sort((a, b) => a.priority - b.priority || a.queueNumber - b.queueNumber),
+    [items]
+  )
+
   const myPosition = myItem?.status === 'waiting'
     ? waitingSorted.findIndex((i) => i.queueNumber === myItem.queueNumber) + 1
     : null
@@ -51,24 +60,28 @@ export default function Queue() {
           <Users size={24} className="mx-auto mb-2 text-gray-300" />
           <div className="text-sm text-gray-500 mb-1">您的排队号</div>
           <div className="stat-value text-primary-500">{myItem?.queueNumber ?? '--'}</div>
+          {myItem && (
+            <div className="text-xs text-gray-400 mt-1">
+              {myItem.status === 'waiting' && `前方还有 ${Math.max(0, (myPosition ?? 1) - 1)} 人`}
+              {myItem.status === 'consulting' && <span className="text-primary-500">就诊中</span>}
+              {myItem.status === 'called' && <span className="text-danger-500 animate-blink">正在叫号中</span>}
+              {myItem.status === 'done' && <span className="text-success-500">已完成</span>}
+            </div>
+          )}
           {myItem && myItem.status === 'waiting' && (
-            <div className="text-xs text-gray-400 mt-1">前方还有 {Math.max(0, (myPosition ?? 1) - 1)} 人</div>
-          )}
-          {myItem && myItem.status === 'consulting' && (
-            <div className="text-xs text-primary-500 mt-1">就诊中</div>
-          )}
-          {myItem && myItem.status === 'called' && (
-            <div className="text-xs text-danger-500 mt-1 animate-blink">正在叫号中</div>
-          )}
-          {myItem && myItem.status === 'done' && (
-            <div className="text-xs text-success-500 mt-1">已完成</div>
+            <div className="text-xs text-gray-400 mt-0.5">
+              {myItem.department} · {myItem.doctorName}
+            </div>
           )}
         </div>
 
         <div className="card text-center">
           <Clock size={24} className="mx-auto mb-2 text-gray-300" />
           <div className="text-sm text-gray-500 mb-1">预计等候</div>
-          <div className="stat-value text-amber-500">{myItem?.estimatedWait ?? 0}<span className="text-base ml-1">分钟</span></div>
+          <div className="stat-value text-amber-500">
+            {myItem?.estimatedWait ?? 0}
+            <span className="text-base ml-1">分钟</span>
+          </div>
         </div>
       </div>
 
@@ -76,7 +89,9 @@ export default function Queue() {
         <div className="card border-2 border-danger-500 bg-danger-50 animate-pulse-slow">
           <div className="flex items-center justify-center gap-3 text-danger-600">
             <Volume2 size={24} />
-            <span className="text-lg font-bold">请 {myItem.patientName} 到 {myItem.department} 就诊！</span>
+            <span className="text-lg font-bold">
+              请 {myItem.patientName} 到 {myItem.department}（{myItem.doctorName}）就诊！
+            </span>
           </div>
         </div>
       )}
@@ -105,19 +120,35 @@ export default function Queue() {
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
-              <tr
-                key={item.queueNumber}
-                className={`border-b border-gray-50 ${item.patientId === user?.id ? 'bg-primary-50/50' : ''} ${item.status === 'called' ? 'bg-danger-50/50' : ''}`}
-              >
-                <td className="py-2.5 font-mono font-medium">{item.queueNumber}</td>
-                <td className="py-2.5">{item.patientName}</td>
-                <td className="py-2.5">{item.department}</td>
-                <td className="py-2.5">{item.doctorName}</td>
-                <td className="py-2.5"><span className={`badge ${statusBadge[item.status]}`}>{statusLabel[item.status]}</span></td>
-                <td className="py-2.5 text-gray-500">{item.estimatedWait > 0 ? `${item.estimatedWait}分钟` : '-'}</td>
-              </tr>
-            ))}
+            {items.map((item) => {
+              const isMyCurrent = myItem?.queueNumber === item.queueNumber
+              return (
+                <tr
+                  key={item.queueNumber}
+                  className={`border-b border-gray-50 ${item.status === 'called' ? 'bg-danger-50/50' : ''} ${
+                    isMyCurrent ? 'bg-primary-50' : ''
+                  }`}
+                >
+                  <td className="py-2.5 font-mono font-medium">
+                    {item.queueNumber}
+                    {isMyCurrent && (
+                      <span className="inline-flex items-center gap-0.5 ml-2 px-1.5 py-0.5 rounded bg-primary-500 text-white text-[10px] font-medium align-middle">
+                        <Pin size={9} />本次
+                      </span>
+                    )}
+                  </td>
+                  <td className={`py-2.5 ${isMyCurrent ? 'font-semibold text-primary-700' : ''}`}>
+                    {item.patientName}
+                  </td>
+                  <td className="py-2.5">{item.department}</td>
+                  <td className="py-2.5">{item.doctorName}</td>
+                  <td className="py-2.5">
+                    <span className={`badge ${statusBadge[item.status]}`}>{statusLabel[item.status]}</span>
+                  </td>
+                  <td className="py-2.5 text-gray-500">{item.estimatedWait > 0 ? `${item.estimatedWait}分钟` : '-'}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

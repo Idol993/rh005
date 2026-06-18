@@ -24,6 +24,7 @@ interface QueueState {
   callNext: () => void
   adjustPriority: (queueNumber: number, delta: number) => void
   recalculateWaitTimes: () => void
+  getLatestRegistrationForPatient: (patientId: string) => QueueItem | null
 }
 
 export const useQueueStore = create<QueueState>((set, get) => ({
@@ -33,17 +34,17 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
   addRegistration: ({ patientId, patientName, department, doctorName, estimatedWait }) => {
     const { items } = get()
-    const newNumber = Math.max(...items.map((i) => i.queueNumber), ...mockQueueItems.map((i) => i.queueNumber)) + 1
+    const existingNumbers = [...mockQueueItems, ...items].map((i) => i.queueNumber)
+    const newNumber = Math.max(0, ...existingNumbers) + 1
     const waitingItems = items.filter((i) => i.status === 'waiting')
     const priority = waitingItems.length + 1
-    const waitTime = waitingItems.reduce((sum) => sum + 15, 0) + estimatedWait
     const newItem: QueueItem = {
       queueNumber: newNumber,
       patientName,
       department,
       doctorName,
       status: 'waiting',
-      estimatedWait: waitTime,
+      estimatedWait: estimatedWait,
       priority,
       patientId,
     }
@@ -51,10 +52,9 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       items: [...state.items, newItem],
       registrations: [
         ...state.registrations,
-        { queueNumber: newNumber, patientId, patientName, department, doctorName, estimatedWait: waitTime, createdAt: new Date().toISOString() },
+        { queueNumber: newNumber, patientId, patientName, department, doctorName, estimatedWait, createdAt: new Date().toISOString() },
       ],
     }))
-    get().recalculateWaitTimes()
     return newNumber
   },
 
@@ -83,7 +83,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       .filter((i) => i.status === 'waiting')
       .sort((a, b) => a.priority - b.priority || a.queueNumber - b.queueNumber)
     const currentIdx = waitingSorted.findIndex((i) => i.queueNumber === queueNumber)
-    const newIdx = Math.max(0, Math.min(waitingSorted.length - 1, currentIdx - delta))
+    const newIdx = Math.max(0, Math.min(waitingSorted.length - 1, currentIdx + delta))
     if (currentIdx === newIdx) return
     const [moved] = waitingSorted.splice(currentIdx, 1)
     waitingSorted.splice(newIdx, 0, moved)
@@ -115,5 +115,18 @@ export const useQueueStore = create<QueueState>((set, get) => ({
         }),
       }
     })
+  },
+
+  getLatestRegistrationForPatient: (patientId) => {
+    const { items, registrations } = get()
+    const myRegs = registrations.filter((r) => r.patientId === patientId)
+    if (myRegs.length > 0) {
+      const latest = myRegs.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+      const found = items.find((i) => i.queueNumber === latest.queueNumber)
+      if (found) return found
+    }
+    const fallback = items.filter((i) => i.patientId === patientId)
+    if (fallback.length === 0) return null
+    return fallback.sort((a, b) => b.queueNumber - a.queueNumber)[0]
   },
 }))

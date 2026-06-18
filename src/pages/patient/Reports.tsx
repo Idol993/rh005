@@ -58,9 +58,8 @@ export default function Reports() {
             return (
               <button
                 key={report.reportId}
-                onClick={() => isApproved ? navigate(`/patient/report/${report.reportId}`) : undefined}
-                className={`card-hover text-left group relative ${!isApproved ? 'opacity-75' : ''}`}
-                style={{ cursor: isApproved ? 'pointer' : 'not-allowed' }}
+                onClick={() => navigate(`/patient/report/${report.reportId}`)}
+                className="card-hover text-left group relative"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">

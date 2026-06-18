@@ -85,6 +85,11 @@ export interface LabReport {
   items: LabItem[]
   aiSummary: string
   abnormalItems: LabItem[]
+  followUp?: {
+    suggestedDepartment: string
+    recheckWithin: string
+    focusItems: string[]
+  }
 }
 
 export interface VitalSigns {
@@ -124,6 +129,7 @@ export interface DispensingDrug {
   quantity: number
   barcode: string
   scanStatus: 'pending' | 'verified' | 'mismatch'
+  usage?: string
 }
 
 export interface DispensingTask {
@@ -132,10 +138,11 @@ export interface DispensingTask {
   patientId: string
   patientName: string
   drugs: DispensingDrug[]
-  status: 'pending' | 'dispensing' | 'scanning' | 'completed'
+  status: 'pending' | 'dispensing' | 'scanning' | 'completed' | 'picked'
   robotArmStatus: 'idle' | 'moving' | 'grabbing' | 'placing'
   progress: number
   createdAt: string
+  pickupWindow?: string
 }
 
 export interface BillingItem {

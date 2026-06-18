@@ -13,6 +13,7 @@ export default function Reports() {
 
   const approvedCount = myReports.filter((r) => reviewStatus[r.reportId] === 'approved').length
   const pendingCount = myReports.filter((r) => (reviewStatus[r.reportId] ?? 'pending') === 'pending').length
+  const rejectedCount = myReports.filter((r) => reviewStatus[r.reportId] === 'rejected').length
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -30,6 +31,12 @@ export default function Reports() {
             <div className="flex items-center gap-2">
               <span className="text-gray-500">待签发</span>
               <span className="badge badge-warning">{pendingCount}</span>
+            </div>
+          )}
+          {rejectedCount > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500">待修改</span>
+              <span className="badge badge-danger">{rejectedCount}</span>
             </div>
           )}
         </div>
@@ -54,7 +61,9 @@ export default function Reports() {
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {myReports.map((report) => {
-            const isApproved = reviewStatus[report.reportId] === 'approved'
+            const status = reviewStatus[report.reportId] ?? 'pending'
+            const isApproved = status === 'approved'
+            const isRejected = status === 'rejected'
             return (
               <button
                 key={report.reportId}
@@ -63,9 +72,13 @@ export default function Reports() {
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isApproved ? 'bg-primary-50' : 'bg-gray-100'}`}>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      isApproved ? 'bg-primary-50' : isRejected ? 'bg-danger-50' : 'bg-gray-100'
+                    }`}>
                       {isApproved ? (
                         <FileText size={20} className="text-primary-500" />
+                      ) : isRejected ? (
+                        <AlertTriangle size={18} className="text-danger-400" />
                       ) : (
                         <Lock size={18} className="text-gray-400" />
                       )}
@@ -79,6 +92,8 @@ export default function Reports() {
                   </div>
                   {isApproved ? (
                     <ChevronRight size={16} className="text-gray-300 group-hover:text-primary-500 transition-colors mt-1.5" />
+                  ) : isRejected ? (
+                    <span className="badge badge-danger">待修改</span>
                   ) : (
                     <span className="badge badge-warning">待签发</span>
                   )}
@@ -94,6 +109,8 @@ export default function Reports() {
                     ) : (
                       <span className="badge badge-success">全部正常</span>
                     )
+                  ) : isRejected ? (
+                    <span className="text-xs text-danger-500">请联系医师修改</span>
                   ) : (
                     <span className="text-xs text-gray-400">签发后可见详情</span>
                   )}

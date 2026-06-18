@@ -143,6 +143,21 @@ export const mockLabReports: LabReport[] = [
 
 mockLabReports.forEach((r) => {
   r.abnormalItems = r.items.filter((i) => i.isAbnormal)
+  if (r.abnormalItems.length > 0) {
+    const map: Record<string, { dept: string; recheck: string }> = {
+      '血常规': { dept: '血液科', recheck: '2周内' },
+      '肝功能': { dept: '消化内科', recheck: '1个月内' },
+      '血脂检查': { dept: '心血管内科', recheck: '1个月内' },
+      '肾功能': { dept: '肾内科', recheck: '2周内' },
+      '血糖': { dept: '内分泌科', recheck: '2周内' },
+    }
+    const cfg = map[r.type] || { dept: '全科', recheck: '1个月内' }
+    r.followUp = {
+      suggestedDepartment: cfg.dept,
+      recheckWithin: cfg.recheck,
+      focusItems: r.abnormalItems.slice(0, 3).map((i) => i.name),
+    }
+  }
 })
 
 function generateVitalHistory(baseValue: number, variance: number, count: number) {
@@ -223,32 +238,32 @@ export const mockDispensingTasks: DispensingTask[] = [
   {
     taskId: 'DT001', prescriptionId: 'PX001', patientId: 'P001', patientName: '张三',
     drugs: [
-      { drugId: 'DR001', drugName: '阿司匹林', quantity: 30, barcode: '6901234567001', scanStatus: 'verified' },
-      { drugId: 'DR006', drugName: '硝苯地平', quantity: 30, barcode: '6901234567002', scanStatus: 'verified' },
+      { drugId: 'DR001', drugName: '阿司匹林', quantity: 30, barcode: '6901234567001', scanStatus: 'verified', usage: '每日1次，每次1片，饭后服用' },
+      { drugId: 'DR006', drugName: '硝苯地平', quantity: 30, barcode: '6901234567002', scanStatus: 'verified', usage: '每日2次，每次1片，早晚服用' },
     ],
-    status: 'completed', robotArmStatus: 'idle', progress: 100, createdAt: '2026-06-18 09:30',
+    status: 'picked', robotArmStatus: 'idle', progress: 100, pickupWindow: '1号窗口', createdAt: '2026-06-18 09:30',
   },
   {
     taskId: 'DT002', prescriptionId: 'PX002', patientId: 'P002', patientName: '李四',
     drugs: [
-      { drugId: 'DR007', drugName: '二甲双胍', quantity: 60, barcode: '6901234567003', scanStatus: 'verified' },
-      { drugId: 'DR011', drugName: '辛伐他汀', quantity: 30, barcode: '6901234567004', scanStatus: 'pending' },
+      { drugId: 'DR007', drugName: '二甲双胍', quantity: 60, barcode: '6901234567003', scanStatus: 'verified', usage: '每日2次，每次1片，餐中服用' },
+      { drugId: 'DR011', drugName: '辛伐他汀', quantity: 30, barcode: '6901234567004', scanStatus: 'verified', usage: '每晚1次，每次1片，睡前服用' },
     ],
-    status: 'scanning', robotArmStatus: 'placing', progress: 75, createdAt: '2026-06-18 10:15',
+    status: 'completed', robotArmStatus: 'idle', progress: 100, pickupWindow: '2号窗口', createdAt: '2026-06-18 10:15',
   },
   {
     taskId: 'DT003', prescriptionId: 'PX003', patientId: 'P003', patientName: '王五',
     drugs: [
-      { drugId: 'DR003', drugName: '阿莫西林', quantity: 21, barcode: '6901234567005', scanStatus: 'pending' },
-      { drugId: 'DR009', drugName: '奥美拉唑', quantity: 14, barcode: '6901234567006', scanStatus: 'pending' },
+      { drugId: 'DR003', drugName: '阿莫西林', quantity: 21, barcode: '6901234567005', scanStatus: 'pending', usage: '每日3次，每次1片，饭后服用' },
+      { drugId: 'DR009', drugName: '奥美拉唑', quantity: 14, barcode: '6901234567006', scanStatus: 'pending', usage: '每日1次，每次1片，晨起空腹服用' },
     ],
     status: 'dispensing', robotArmStatus: 'grabbing', progress: 40, createdAt: '2026-06-18 10:45',
   },
   {
     taskId: 'DT004', prescriptionId: 'PX004', patientId: 'P004', patientName: '赵六',
     drugs: [
-      { drugId: 'DR014', drugName: '氨氯地平', quantity: 30, barcode: '6901234567007', scanStatus: 'pending' },
-      { drugId: 'DR012', drugName: '美托洛尔', quantity: 30, barcode: '6901234567008', scanStatus: 'pending' },
+      { drugId: 'DR014', drugName: '氨氯地平', quantity: 30, barcode: '6901234567007', scanStatus: 'pending', usage: '每日1次，每次1片，晨起服用' },
+      { drugId: 'DR012', drugName: '美托洛尔', quantity: 30, barcode: '6901234567008', scanStatus: 'pending', usage: '每日2次，每次1片，早晚服用' },
     ],
     status: 'pending', robotArmStatus: 'idle', progress: 0, createdAt: '2026-06-18 11:00',
   },

@@ -16,6 +16,10 @@ import {
   X,
   Pill,
   PackageCheck,
+  DoorOpen,
+  Barcode,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -72,13 +76,17 @@ export default function PatientHome() {
     dispensing: '调配中',
     scanning: '扫码核对中',
     completed: '可取药',
+    picked: '已取药',
   }
   const pharmStatusColor: Record<string, string> = {
     pending: 'text-amber-500',
     dispensing: 'text-primary-500',
     scanning: 'text-blue-500',
     completed: 'text-success-500',
+    picked: 'text-gray-500',
   }
+  const markAsPicked = usePharmacyStore((s) => s.markAsPicked)
+  const [pickedConfirm, setPickedConfirm] = useState(false)
 
   const myUnreadNotif = notifications.find(
     (n) => n.patientId === user?.id && !n.read && n.id !== dismissedNotif
@@ -242,7 +250,7 @@ export default function PatientHome() {
                     {pharmStatusLabel[latestPharmacyTask.status]}
                   </span>
                 </div>
-                {latestPharmacyTask.status !== 'pending' && latestPharmacyTask.status !== 'completed' && (
+                {latestPharmacyTask.status !== 'pending' && latestPharmacyTask.status !== 'completed' && latestPharmacyTask.status !== 'picked' && (
                   <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1.5">
                     <div
                       className="bg-primary-500 h-1.5 rounded-full"
@@ -253,10 +261,51 @@ export default function PatientHome() {
                 <div className="text-[11px] text-gray-400 mt-1.5">
                   {latestPharmacyTask.drugs.length} 种药品 · 任务号 {latestPharmacyTask.taskId}
                 </div>
-                {latestPharmacyTask.status === 'completed' && (
+
+                {latestPharmacyTask.status === 'completed' && !pickedConfirm && (
+                  <div className="mt-3 space-y-3">
+                    <div className="flex items-center gap-2 text-[11px] text-success-600 bg-success-50 px-2 py-1.5 rounded-md">
+                      <DoorOpen size={12} />
+                      请到 {latestPharmacyTask.pickupWindow} 取药
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-gray-700">药品清单：</div>
+                      {latestPharmacyTask.drugs.map((d) => (
+                        <div key={d.drugId} className="p-2.5 bg-gray-50 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-800">{d.drugName}</span>
+                            <span className="text-xs text-gray-500">×{d.quantity}</span>
+                          </div>
+                          {d.usage && (
+                            <div className="text-[11px] text-primary-600 mt-1 flex items-start gap-1">
+                              <AlertCircle size={10} className="mt-0.5 flex-shrink-0" />
+                              <span>{d.usage}</span>
+                            </div>
+                          )}
+                          <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                            <Barcode size={10} />
+                            {d.barcode}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => {
+                        markAsPicked(latestPharmacyTask.taskId)
+                        setPickedConfirm(true)
+                      }}
+                      className="w-full btn-success flex items-center justify-center gap-1.5 text-sm"
+                    >
+                      <CheckCircle2 size={14} />
+                      确认已取药
+                    </button>
+                  </div>
+                )}
+
+                {(latestPharmacyTask.status === 'picked' || pickedConfirm) && (
                   <div className="flex items-center gap-1 text-[11px] text-success-600 mt-1.5 bg-success-50 px-2 py-1 rounded-md">
                     <PackageCheck size={12} />
-                    请到取药窗口领取
+                    本次处方已完成取药
                   </div>
                 )}
               </div>

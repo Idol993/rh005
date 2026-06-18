@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Sparkles, Upload, Shield, Star, CheckCircle, ChevronRight, ChevronLeft, FileUp, X, Loader2 } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Sparkles, Upload, Shield, Star, CheckCircle, ChevronRight, ChevronLeft, FileUp, X, Loader2, Stethoscope } from 'lucide-react'
 import { symptomKeywords, mockDoctors } from '@/mock/data'
 import type { DoctorRecommendation } from '@/types'
 import { useQueueStore } from '@/store/useQueueStore'
@@ -10,6 +10,7 @@ const steps = ['症状描述', '病史上传', '医保绑定', '推荐医生']
 
 export default function Register() {
   const navigate = useNavigate()
+  const location = useLocation() as { state?: { followUp?: { suggestedDepartment: string; recheckWithin: string; focusItems: string[]; reportType: string } } }
   const user = useAuthStore((s) => s.user)
   const addRegistration = useQueueStore((s) => s.addRegistration)
   const [step, setStep] = useState(0)
@@ -25,6 +26,15 @@ export default function Register() {
   const [confirmed, setConfirmed] = useState(false)
   const [assignedQueueNumber, setAssignedQueueNumber] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const followUp = location.state?.followUp
+
+  useEffect(() => {
+    if (followUp?.suggestedDepartment) {
+      setRecommendedDepts([followUp.suggestedDepartment])
+      setSymptoms(`复查${followUp.reportType}，重点关注：${followUp.focusItems.join('、')}`)
+      setStep(3)
+    }
+  }, [followUp])
 
   const handleAnalyze = () => {
     if (!symptoms.trim()) return
@@ -239,6 +249,22 @@ export default function Register() {
 
       {step === 3 && (
         <div className="card">
+          {followUp && (
+            <div className="mb-4 p-3 bg-primary-50 rounded-xl border border-primary-100">
+              <div className="flex items-start gap-2">
+                <Stethoscope size={16} className="text-primary-500 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <div className="font-medium text-primary-700">复诊挂号 · {followUp.reportType}复查</div>
+                  <div className="text-primary-600 mt-0.5">
+                    建议科室：{followUp.suggestedDepartment} · {followUp.recheckWithin}复查
+                  </div>
+                  <div className="text-primary-500 text-xs mt-0.5">
+                    重点关注：{followUp.focusItems.join('、')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <h2 className="font-semibold text-gray-800 mb-4">为您推荐以下医生</h2>
           <div className="space-y-3">
             {filteredDoctors.map((doc) => (

@@ -11,7 +11,7 @@ const statusLabel: Record<QueueItem['status'], { text: string; cls: string }> = 
 }
 
 export default function Triage() {
-  const { items, callNext, currentNumber, callNextForDoctor, adjustPriority, getDoctors, getDoctorQueue, getCurrentForDoctor } = useQueueStore()
+  const { items, callNextForDoctor, adjustPriority, getDoctors, getDoctorQueue, getCurrentForDoctor } = useQueueStore()
 
   const doctors = getDoctors()
 
@@ -22,11 +22,10 @@ export default function Triage() {
           <h1 className="text-2xl font-bold text-gray-900">导诊管理</h1>
           <p className="text-sm text-gray-500 mt-0.5">按诊室分别叫号 · 支持优先级调整</p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">全局最近叫号: <span className="font-mono font-bold text-primary-500">{currentNumber}</span></span>
-          <button className="btn-secondary flex items-center gap-2" onClick={callNext}>
-            <Megaphone className="w-4 h-4" />全局叫号
-          </button>
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <span>共 {doctors.length} 位医生出诊</span>
+          <span>·</span>
+          <span>候诊 {items.filter(i => i.status === 'waiting').length} 人</span>
         </div>
       </div>
 

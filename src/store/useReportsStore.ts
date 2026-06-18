@@ -135,6 +135,25 @@ export const reportTemplates: Record<string, { name: string; unit: string; refer
   ],
 }
 
+function generateFollowUp(type: string, abnormalItems: LabItem[]): LabReport['followUp'] {
+  if (abnormalItems.length === 0) return undefined
+
+  const map: Record<string, { dept: string; recheck: string }> = {
+    '血常规': { dept: '血液科', recheck: '2周内' },
+    '肝功能': { dept: '消化内科', recheck: '1个月内' },
+    '血脂检查': { dept: '心血管内科', recheck: '1个月内' },
+    '肾功能': { dept: '肾内科', recheck: '2周内' },
+    '血糖': { dept: '内分泌科', recheck: '2周内' },
+  }
+  const cfg = map[type] || { dept: '全科', recheck: '1个月内' }
+
+  return {
+    suggestedDepartment: cfg.dept,
+    recheckWithin: cfg.recheck,
+    focusItems: abnormalItems.slice(0, 3).map((i) => i.name),
+  }
+}
+
 export const useReportsStore = create<ReportState>((set, get) => ({
   reports: [...mockLabReports],
   reviewStatus: initialReviewStatus,
@@ -143,6 +162,7 @@ export const useReportsStore = create<ReportState>((set, get) => ({
     const analyzedItems = items.map(analyzeItem)
     const abnormalItems = analyzedItems.filter((i) => i.isAbnormal)
     const aiSummary = generateAiSummary(type, abnormalItems, analyzedItems.length)
+    const followUp = generateFollowUp(type, abnormalItems)
     const reportId = buildReportId(get().reports)
     const report: LabReport = {
       reportId,
@@ -153,6 +173,7 @@ export const useReportsStore = create<ReportState>((set, get) => ({
       items: analyzedItems,
       abnormalItems,
       aiSummary,
+      followUp,
     }
     set((s) => ({
       reports: [...s.reports, report],

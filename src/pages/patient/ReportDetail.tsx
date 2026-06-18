@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowUp, ArrowDown, ArrowLeft, Sparkles, AlertTriangle, FileText, Lock } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowLeft, Sparkles, AlertTriangle, FileText, Lock, Stethoscope, Calendar, ClipboardList } from 'lucide-react'
 import { useReportsStore } from '@/store/useReportsStore'
 
 export default function ReportDetail() {
@@ -20,6 +20,7 @@ export default function ReportDetail() {
 
   const status = reviewStatus[report.reportId] ?? 'pending'
   const isApproved = status === 'approved'
+  const isRejected = status === 'rejected'
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -30,14 +31,21 @@ export default function ReportDetail() {
         <ArrowLeft size={16} />返回报告列表
       </button>
 
-      {!isApproved ? (
+      {isRejected ? (
+        <div className="card text-center py-12 border-danger-200 border">
+          <AlertTriangle size={48} className="mx-auto text-danger-300 mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">报告待修改</h2>
+          <p className="text-gray-500 mb-4">这份报告状态为：
+            <span className="badge badge-danger ml-2">已退回修改</span>
+          </p>
+          <p className="text-sm text-gray-400">医师对报告有修改意见，请联系检验科重新复核</p>
+        </div>
+      ) : !isApproved ? (
         <div className="card text-center py-12 border-amber-200 border">
           <Lock size={48} className="mx-auto text-amber-300 mb-4" />
           <h2 className="text-xl font-semibold text-gray-800 mb-2">报告待签发</h2>
           <p className="text-gray-500 mb-4">这份报告目前状态为：
-            <span className={`badge ${status === 'rejected' ? 'badge-danger ml-2' : 'badge-warning ml-2'}`}>
-              {status === 'rejected' ? '已退回修改' : '待签发'}
-            </span>
+            <span className="badge badge-warning ml-2">待签发</span>
           </p>
           <p className="text-sm text-gray-400">请等待医师完成审核签发，签发后即可查看完整详情</p>
         </div>
@@ -117,6 +125,53 @@ export default function ReportDetail() {
                     </span>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {report.followUp && (
+            <div className="card bg-gradient-to-br from-amber-50 to-primary-50 border-amber-100">
+              <div className="flex items-center gap-2 mb-4">
+                <Stethoscope size={18} className="text-amber-600" />
+                <h2 className="font-semibold text-amber-800">复诊建议</h2>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="bg-white rounded-xl p-4">
+                  <div className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                    <ClipboardList size={12} />建议科室
+                  </div>
+                  <div className="text-lg font-bold text-gray-800">{report.followUp.suggestedDepartment}</div>
+                </div>
+                <div className="bg-white rounded-xl p-4">
+                  <div className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                    <Calendar size={12} />复查时间
+                  </div>
+                  <div className="text-lg font-bold text-gray-800">{report.followUp.recheckWithin}</div>
+                </div>
+                <div className="bg-white rounded-xl p-4">
+                  <div className="text-xs text-gray-500 mb-1">需关注指标</div>
+                  <div className="text-sm font-bold text-danger-600">{report.followUp.focusItems.length}项</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-white rounded-xl">
+                <div>
+                  <div className="text-sm font-medium text-gray-800">重点关注：{report.followUp.focusItems.join('、')}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">建议在 {report.followUp.recheckWithin} 前往 {report.followUp.suggestedDepartment} 复诊</div>
+                </div>
+                <button
+                  onClick={() => navigate('/patient/register', {
+                    state: {
+                      followUp: {
+                        ...report.followUp,
+                        reportType: report.type,
+                      },
+                    },
+                  })}
+                  className="btn-primary flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <Stethoscope size={14} />
+                  一键复诊挂号
+                </button>
               </div>
             </div>
           )}

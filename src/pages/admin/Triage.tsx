@@ -29,10 +29,7 @@ export default function Triage() {
   }, {})
 
   const adjustPriority = (queueNumber: number, delta: number) => {
-    const item = items.find((i) => i.queueNumber === queueNumber)
-    if (item && item.priority + delta >= 1) {
-      item.priority += delta
-    }
+    useQueueStore.getState().adjustPriority(queueNumber, delta)
   }
 
   return (

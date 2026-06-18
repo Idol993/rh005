@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { usePrescriptionStore } from '@/store/usePrescriptionStore'
+import { usePharmacyStore } from '@/store/usePharmacyStore'
 import { mockDrugs } from '@/mock/data'
 import type { PrescriptionItem } from '@/types'
-import { Search, Plus, Trash2, AlertTriangle, X, ShieldAlert } from 'lucide-react'
+import { Search, Plus, Trash2, AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react'
 
 export default function Prescription() {
   const [search, setSearch] = useState('')
@@ -10,11 +11,11 @@ export default function Prescription() {
     draftItems,
     showConflictModal,
     conflicts,
+    hasBlockingConflict,
     addDrug,
     removeDrug,
     reviewPrescription,
     dismissConflict,
-    forceSubmit,
   } = usePrescriptionStore()
 
   const filteredDrugs = mockDrugs.filter(
@@ -135,24 +136,33 @@ export default function Prescription() {
 
       {showConflictModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl border-2 border-danger-500 shadow-xl w-full max-w-lg animate-scale-in">
+          <div className={`bg-white rounded-xl shadow-xl w-full max-w-lg animate-scale-in ${hasBlockingConflict ? 'border-2 border-danger-500' : 'border-2 border-amber-400'}`}>
             <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-danger-50 flex items-center justify-center">
-                  <ShieldAlert className="w-5 h-5 text-danger-500" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasBlockingConflict ? 'bg-danger-50' : 'bg-amber-50'}`}>
+                    <ShieldAlert className={`w-5 h-5 ${hasBlockingConflict ? 'text-danger-500' : 'text-amber-500'}`} />
+                  </div>
+                  <div>
+                    <h3 className={`text-lg font-bold ${hasBlockingConflict ? 'text-danger-500' : 'text-amber-600'}`}>
+                      {hasBlockingConflict ? '处方高风险冲突拦截' : '处方冲突提示'}
+                    </h3>
+                    {hasBlockingConflict && (
+                      <p className="text-xs text-danger-500 mt-0.5">发现严重风险，禁止提交，请先修改处方</p>
+                    )}
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold text-danger-500">处方冲突拦截</h3>
               </div>
-              <div className="space-y-3 mb-6">
+              <div className="space-y-3 mb-6 max-h-72 overflow-y-auto">
                 {conflicts.map((conflict) => (
-                  <div key={conflict.id} className="border rounded-lg p-3">
+                  <div key={conflict.id} className={`border rounded-lg p-3 ${conflict.severity === 'critical' ? 'border-danger-200 bg-danger-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
                     <div className="flex items-center gap-2 mb-1">
                       <span
                         className={`badge ${
                           conflict.severity === 'critical' ? 'badge-danger' : 'badge-warning'
                         }`}
                       >
-                        {conflict.severity === 'critical' ? '严重' : '警告'}
+                        {conflict.severity === 'critical' ? '高风险' : '注意'}
                       </span>
                       <AlertTriangle
                         className={`w-4 h-4 ${
@@ -164,17 +174,53 @@ export default function Prescription() {
                     <p className="text-xs text-gray-500">
                       相关药品：{conflict.relatedDrugs.join('、')}
                     </p>
-                    <p className="text-xs text-primary-600 mt-1">建议：{conflict.suggestion}</p>
+                    <p className="text-xs text-primary-700 mt-1 bg-primary-50 p-2 rounded">建议：{conflict.suggestion}</p>
                   </div>
                 ))}
               </div>
               <div className="flex gap-3">
-                <button onClick={dismissConflict} className="btn-secondary flex-1">
-                  返回修改
+                <button onClick={dismissConflict} className={`flex-1 ${hasBlockingConflict ? 'btn-primary w-full' : 'btn-secondary'}`}>
+                  {hasBlockingConflict ? '返回修改处方' : '返回修改'}
                 </button>
-                <button onClick={forceSubmit} className="btn-danger flex-1">
-                  强制提交
-                </button>
+                {!hasBlockingConflict && (
+                  <button
+                    onClick={() => {
+                      const s = usePrescriptionStore.getState()
+                      const prescription = {
+                        id: `PX-${Date.now()}`,
+                        patientId: s.currentPatientId,
+                        patientName: s.currentPatientName,
+                        doctorId: 'M001',
+                        doctorName: '王医生',
+                        items: s.draftItems,
+                        conflicts: s.conflicts,
+                        status: 'approved' as const,
+                        createdAt: new Date().toISOString(),
+                      }
+                      usePharmacyStore.getState().addDispensingTask({
+                        prescriptionId: prescription.id,
+                        patientName: s.currentPatientName,
+                        drugs: s.draftItems.map((item) => ({
+                          drugId: item.drugId,
+                          drugName: item.drugName,
+                          quantity: item.quantity,
+                          barcode: `69${String(Math.floor(Math.random() * 1e10)).padStart(10, '0')}`,
+                          scanStatus: 'pending' as const,
+                        })),
+                      })
+                      usePrescriptionStore.setState({
+                        currentPrescription: prescription,
+                        draftItems: [],
+                        conflicts: [],
+                        showConflictModal: false,
+                        hasBlockingConflict: false,
+                      })
+                    }}
+                    className="btn-danger flex-1"
+                  >
+                    告知后提交
+                  </button>
+                )}
               </div>
             </div>
           </div>

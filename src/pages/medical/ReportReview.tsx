@@ -1,21 +1,13 @@
 import { useState } from 'react'
-import { mockLabReports } from '@/mock/data'
+import { useReportsStore } from '@/store/useReportsStore'
 import { FileText, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, XCircle, Sparkles } from 'lucide-react'
 
 export default function ReportReview() {
+  const { reports, reviewStatus, setReviewStatus } = useReportsStore()
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [reviewStatus, setReviewStatus] = useState<Record<string, 'approved' | 'rejected'>>({})
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id)
-  }
-
-  const handleApprove = (id: string) => {
-    setReviewStatus((prev) => ({ ...prev, [id]: 'approved' }))
-  }
-
-  const handleReject = (id: string) => {
-    setReviewStatus((prev) => ({ ...prev, [id]: 'rejected' }))
   }
 
   const getDirectionLabel = (direction: string) => {
@@ -24,14 +16,32 @@ export default function ReportReview() {
     return ''
   }
 
+  const pendingCount = reports.filter((r) => (reviewStatus[r.reportId] || 'pending') === 'pending').length
+  const approvedCount = reports.filter((r) => reviewStatus[r.reportId] === 'approved').length
+
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">报告审核</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">报告审核</h1>
+          <p className="text-sm text-gray-500 mt-0.5">AI 辅助异常识别 · 医师确认签发</p>
+        </div>
+        <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500">待审核</span>
+            <span className="badge badge-warning">{pendingCount}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500">已通过</span>
+            <span className="badge badge-success">{approvedCount}</span>
+          </div>
+        </div>
+      </div>
 
       <div className="space-y-3">
-        {mockLabReports.map((report) => {
+        {reports.map((report) => {
           const isExpanded = expandedId === report.reportId
-          const status = reviewStatus[report.reportId]
+          const status = reviewStatus[report.reportId] || 'pending'
           const abnormalCount = report.abnormalItems.length
 
           return (
@@ -56,10 +66,13 @@ export default function ReportReview() {
                     </span>
                   )}
                   {status === 'approved' && (
-                    <span className="badge badge-success">已通过</span>
+                    <span className="badge badge-success">已签发</span>
                   )}
                   {status === 'rejected' && (
                     <span className="badge badge-danger">已退回</span>
+                  )}
+                  {status === 'pending' && (
+                    <span className="badge badge-warning">待审核</span>
                   )}
                   <span className="text-sm text-gray-400">{report.date}</span>
                   {isExpanded ? (
@@ -110,16 +123,28 @@ export default function ReportReview() {
                     <p className="text-sm text-gray-700 leading-relaxed">{report.aiSummary}</p>
                   </div>
 
-                  {!status && (
+                  {status === 'pending' && (
                     <div className="flex gap-3">
-                      <button onClick={() => handleApprove(report.reportId)} className="btn-success flex items-center gap-1.5">
+                      <button
+                        onClick={() => setReviewStatus(report.reportId, 'approved')}
+                        className="btn-success flex items-center gap-1.5"
+                      >
                         <CheckCircle className="w-4 h-4" />
-                        审核通过
+                        审核通过并签发
                       </button>
-                      <button onClick={() => handleReject(report.reportId)} className="btn-danger flex items-center gap-1.5">
+                      <button
+                        onClick={() => setReviewStatus(report.reportId, 'rejected')}
+                        className="btn-danger flex items-center gap-1.5"
+                      >
                         <XCircle className="w-4 h-4" />
                         退回修改
                       </button>
+                    </div>
+                  )}
+                  {status === 'approved' && (
+                    <div className="flex items-center gap-2 text-success-600 text-sm">
+                      <CheckCircle className="w-4 h-4" />
+                      <span className="font-medium">已签发，报告已推送至患者端</span>
                     </div>
                   )}
                 </div>

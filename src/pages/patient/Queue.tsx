@@ -22,11 +22,14 @@ export default function Queue() {
   const user = useAuthStore((s) => s.user)
 
   const myItem = items.find((i) => i.patientId === user?.id)
-  const myPosition = items.filter(
-    (i) => i.status === 'waiting' && i.priority < (myItem?.priority ?? Infinity)
-  ).length + 1
+  const waitingSorted = items
+    .filter((i) => i.status === 'waiting')
+    .sort((a, b) => a.priority - b.priority || a.queueNumber - b.queueNumber)
+  const myPosition = myItem?.status === 'waiting'
+    ? waitingSorted.findIndex((i) => i.queueNumber === myItem.queueNumber) + 1
+    : null
 
-  const waitingCount = items.filter((i) => i.status === 'waiting').length
+  const waitingCount = waitingSorted.length
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -49,7 +52,16 @@ export default function Queue() {
           <div className="text-sm text-gray-500 mb-1">您的排队号</div>
           <div className="stat-value text-primary-500">{myItem?.queueNumber ?? '--'}</div>
           {myItem && myItem.status === 'waiting' && (
-            <div className="text-xs text-gray-400 mt-1">前方还有 {myPosition - 1} 人</div>
+            <div className="text-xs text-gray-400 mt-1">前方还有 {Math.max(0, (myPosition ?? 1) - 1)} 人</div>
+          )}
+          {myItem && myItem.status === 'consulting' && (
+            <div className="text-xs text-primary-500 mt-1">就诊中</div>
+          )}
+          {myItem && myItem.status === 'called' && (
+            <div className="text-xs text-danger-500 mt-1 animate-blink">正在叫号中</div>
+          )}
+          {myItem && myItem.status === 'done' && (
+            <div className="text-xs text-success-500 mt-1">已完成</div>
           )}
         </div>
 

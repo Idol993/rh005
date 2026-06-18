@@ -1,8 +1,10 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/useAuthStore'
 import { mockQueueItems, mockVitalSigns, mockDashboardMetrics } from '@/mock/data'
 import { FileText, Activity, ClipboardCheck, Calendar, Pill, AlertTriangle, Users, ChevronRight } from 'lucide-react'
 
 export default function MedicalHome() {
+  const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
 
   const todayAppointments = mockQueueItems.filter((q) => q.status !== 'done').length
@@ -19,7 +21,7 @@ export default function MedicalHome() {
   const quickActions = [
     { icon: Pill, label: '处方开具', desc: '开具和审核处方', color: 'bg-primary-50 text-primary-500', path: '/medical/prescription' },
     { icon: Activity, label: '住院监测', desc: '实时生命体征', color: 'bg-danger-50 text-danger-500', path: '/medical/monitor' },
-    { icon: ClipboardCheck, label: '报告审核', desc: '审核检验报告', color: 'bg-success-50 text-success-500', path: '/medical/report-review' },
+    { icon: ClipboardCheck, label: '报告审核', desc: '审核检验报告', color: 'bg-success-50 text-success-500', path: '/medical/reports' },
   ]
 
   return (
@@ -76,7 +78,7 @@ export default function MedicalHome() {
             <button
               key={action.label}
               className="card-hover text-left flex items-center gap-4 group"
-              onClick={() => {}}
+              onClick={() => navigate(action.path)}
             >
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${action.color}`}>
                 <action.icon className="w-6 h-6" />

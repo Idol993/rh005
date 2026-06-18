@@ -3,11 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { Sparkles, Upload, Shield, Star, CheckCircle, ChevronRight, ChevronLeft, FileUp, X, Loader2 } from 'lucide-react'
 import { symptomKeywords, mockDoctors } from '@/mock/data'
 import type { DoctorRecommendation } from '@/types'
+import { useQueueStore } from '@/store/useQueueStore'
+import { useAuthStore } from '@/store/useAuthStore'
 
 const steps = ['症状描述', '病史上传', '医保绑定', '推荐医生']
 
 export default function Register() {
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
+  const addRegistration = useQueueStore((s) => s.addRegistration)
   const [step, setStep] = useState(0)
   const [symptoms, setSymptoms] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
@@ -19,6 +23,7 @@ export default function Register() {
   const [insuranceError, setInsuranceError] = useState('')
   const [selectedDoctor, setSelectedDoctor] = useState<DoctorRecommendation | null>(null)
   const [confirmed, setConfirmed] = useState(false)
+  const [assignedQueueNumber, setAssignedQueueNumber] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleAnalyze = () => {
@@ -77,7 +82,16 @@ export default function Register() {
   }
 
   const handleSelectDoctor = (doc: DoctorRecommendation) => {
+    if (!user) return
+    const qn = addRegistration({
+      patientId: user.id,
+      patientName: user.name,
+      department: doc.department,
+      doctorName: doc.name,
+      estimatedWait: doc.estimatedWait,
+    })
     setSelectedDoctor(doc)
+    setAssignedQueueNumber(qn)
     setConfirmed(true)
   }
 
@@ -106,12 +120,12 @@ export default function Register() {
           <p className="text-gray-500 mb-6">您的排队号已生成，请按时就诊</p>
           <div className="bg-primary-50 rounded-xl py-6 mb-6">
             <div className="text-sm text-primary-600 mb-1">您的排队号</div>
-            <div className="text-4xl font-bold font-mono text-primary-500">{108 + Math.floor(Math.random() * 20)}</div>
+            <div className="text-4xl font-bold font-mono text-primary-500">{assignedQueueNumber}</div>
           </div>
           <div className="text-left space-y-2 text-sm mb-6">
             <div className="flex justify-between"><span className="text-gray-500">科室</span><span className="font-medium">{selectedDoctor.department}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">医生</span><span className="font-medium">{selectedDoctor.name} · {selectedDoctor.title}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">预计等候</span><span className="font-medium">约{selectedDoctor.estimatedWait}分钟</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">擅长</span><span className="font-medium text-right max-w-[60%]">{selectedDoctor.specialty}</span></div>
           </div>
           <div className="flex gap-3">
             <button onClick={() => navigate('/patient/queue')} className="btn-primary flex-1">查看排队</button>
